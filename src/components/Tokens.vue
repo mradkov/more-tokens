@@ -27,6 +27,12 @@
                 />
               </div>
             </div>
+            <progress
+              v-if="loading"
+              class="progress is-small is-primary"
+              max="100"
+              >15%</progress
+            >
             <b-button
               class="is-rounded"
               type="is-primary"
@@ -115,6 +121,7 @@ export default {
       walletName: null,
       balance: null,
       deployed: [],
+      loading: false,
     };
   },
   computed: {
@@ -131,6 +138,7 @@ export default {
       this.deployed.push({ name, address: deployed.address });
     },
     async moreTokens() {
+      this.loading = true;
       this.token.symbol = this.token.name;
       const { name, decimals, symbol, balanceOwner } = this.token;
       console.log(name, decimals, symbol, balanceOwner);
@@ -143,6 +151,7 @@ export default {
         symbol,
         balanceOwner,
       ]);
+      this.loading = false;
       this.logDeployed(name, init);
     },
     async disconnect() {
