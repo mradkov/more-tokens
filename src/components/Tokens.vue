@@ -92,15 +92,20 @@ import BrowserWindowMessageConnection from '@aeternity/aepp-sdk/es/utils/aepp-wa
 import Node from '@aeternity/aepp-sdk/es/node';
 import FUNGIBLE_TOKEN_CONTRACT from 'aeternity-fungible-token/FungibleTokenFull.aes';
 import { AeAddress } from '@aeternity/aepp-components';
+import axios from 'axios';
 
 // Send wallet connection info to Aepp throug content script
 const networks = {
-  ae_uat: {
+  ae_mainnet: {
+    TOKEN_REGISTRY_URL:
+      'https://raendom-backend.z52da5wt.xyz/tokenCache/addToken',
     NODE_URL: 'https://mainnet.aeternity.io',
     NODE_INTERNAL_URL: 'https://mainnet.aeternity.io',
     COMPILER_URL: 'https://latest.compiler.aepps.com',
   },
-  ae_mainnet: {
+  ae_uat: {
+    TOKEN_REGISTRY_URL:
+      'https://testnet.superhero.aeternity.art/tokenCache/addToken',
     NODE_URL: 'https://testnet.aeternity.io',
     NODE_INTERNAL_URL: 'https://testnet.aeternity.io',
     COMPILER_URL: 'https://latest.compiler.aepps.com',
@@ -134,6 +139,7 @@ export default {
       deployed: [],
       loading: false,
       error: null,
+      networkId: 'ae_mainnet',
     };
   },
   computed: {
@@ -148,6 +154,22 @@ export default {
     logDeployed(name, deployed) {
       console.log(deployed);
       this.deployed.push({ name, address: deployed.address });
+    },
+    async registrySubmit(address) {
+      try {
+        await axios.post(
+          networks[this.networkId].TOKEN_REGISTRY_URL,
+          { address },
+          {
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        );
+      } catch (error) {
+        console.log(error);
+        this.error = '💥 Oops ... unable to add token to registry.';
+      }
     },
     async moreTokens() {
       if (!this.token.name || !this.token.balanceOwner) {
@@ -168,6 +190,7 @@ export default {
         balanceOwner,
       ]);
       this.loading = false;
+      this.registrySubmit(init.address);
       this.logDeployed(name, init);
     },
     async disconnect() {
@@ -220,13 +243,13 @@ export default {
   },
   async created() {
     const node = await Node({
-      url: networks.ae_mainnet.NODE_URL,
-      internalUrl: networks.ae_mainnet.NODE_INTERNAL_URL,
+      url: networks[this.networkId].NODE_URL,
+      internalUrl: networks[this.networkId].NODE_INTERNAL_URL,
     });
     this.client = await RpcAepp({
       name: 'AEPP',
-      nodes: [{ name: 'ae_mainnet', instance: node }],
-      compilerUrl: networks.ae_mainnet.COMPILER_URL,
+      nodes: [{ name: this.networkId, instance: node }],
+      compilerUrl: networks[this.networkId].COMPILER_URL,
       onNetworkChange(params) {
         console.log(params);
         if (this.getNetworkId() !== params.networkId)
