@@ -2,44 +2,55 @@
   <section id="features" class="section has-company-bg">
     <div class="container is-10">
       <div class="columns reverse-row-order">
-        <div class="column is-5 is-offset-4">
+        <div class="column is-4">
+          <img src="../assets/monster.png" width="100%" alt="" />
+        </div>
+        <div class="column is-5">
           <h3 class="pl-3 has-text-left is-size-3">
             More Tokens 🔥🔥🔥
           </h3>
+
           <div class="column is-10">
-            <div class="field">
-              <div class="control">
-                <input
-                  class="input is-primary"
-                  type="text"
-                  v-model="token.name"
-                  placeholder="Token"
-                />
-              </div>
+            <div class="content">
+              <b-message v-if="error" type="is-danger">
+                {{ error }}
+              </b-message>
             </div>
-            <div class="field">
-              <div class="control">
-                <input
-                  class="input is-primary"
-                  type="number"
-                  v-model="token.balanceOwner"
-                  placeholder="Owner's balance"
-                />
+            <form @submit.prevent="moreTokens">
+              <div class="field">
+                <div class="control">
+                  <input
+                    class="input is-primary"
+                    type="text"
+                    v-model="token.name"
+                    placeholder="Token"
+                  />
+                </div>
               </div>
-            </div>
-            <progress
-              v-if="loading"
-              class="progress is-small is-primary"
-              max="100"
-              >15%</progress
-            >
-            <b-button
-              class="is-rounded"
-              type="is-primary"
-              size="is-large"
-              @click="moreTokens"
-              >Token 🚀</b-button
-            >
+              <div class="field">
+                <div class="control">
+                  <input
+                    class="input is-primary"
+                    type="number"
+                    v-model="token.balanceOwner"
+                    placeholder="Owner's balance"
+                  />
+                </div>
+              </div>
+              <progress
+                v-if="loading"
+                class="progress is-small is-primary"
+                max="100"
+                >15%</progress
+              >
+              <b-button
+                native-type="submit"
+                class="is-rounded"
+                type="is-primary"
+                size="is-large"
+                >Token 🚀</b-button
+              >
+            </form>
           </div>
         </div>
         <div class="columns is-2">
@@ -122,6 +133,7 @@ export default {
       balance: null,
       deployed: [],
       loading: false,
+      error: null,
     };
   },
   computed: {
@@ -138,6 +150,10 @@ export default {
       this.deployed.push({ name, address: deployed.address });
     },
     async moreTokens() {
+      if (!this.token.name || !this.token.balanceOwner) {
+        this.error = '⚠️ Oops ... fields are required.';
+        return;
+      }
       this.loading = true;
       this.token.symbol = this.token.name;
       const { name, decimals, symbol, balanceOwner } = this.token;
