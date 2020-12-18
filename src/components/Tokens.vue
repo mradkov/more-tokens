@@ -3,7 +3,13 @@
     <div class="container is-10">
       <div class="columns reverse-row-order">
         <div class="column is-4">
-          <img src="../assets/monster.png" width="100%" alt="" />
+          <img
+            v-if="!loading"
+            src="../assets/monster.png"
+            width="100%"
+            alt=""
+          />
+          <img v-else src="../assets/moretokens.gif" width="100%" alt="" />
         </div>
         <div class="column is-5">
           <h3 class="pl-3 has-text-left is-size-3">
@@ -55,6 +61,16 @@
         </div>
         <div class="columns is-2">
           <div class="column has-text-right is-offset-9">
+            <div class="field">
+              <b-switch
+                v-model="networkId"
+                true-value="Mainnet"
+                false-value="Testnet"
+                disabled
+              >
+                {{ networkId }}
+              </b-switch>
+            </div>
             <span class="text-grey-dark">$whoami</span>
             <div v-if="addressResponse">
               <div class="mb-2">
@@ -96,14 +112,14 @@ import axios from 'axios';
 
 // Send wallet connection info to Aepp throug content script
 const networks = {
-  ae_mainnet: {
+  Mainnet: {
     TOKEN_REGISTRY_URL:
       'https://raendom-backend.z52da5wt.xyz/tokenCache/addToken',
     NODE_URL: 'https://mainnet.aeternity.io',
     NODE_INTERNAL_URL: 'https://mainnet.aeternity.io',
     COMPILER_URL: 'https://latest.compiler.aepps.com',
   },
-  ae_uat: {
+  Testnet: {
     TOKEN_REGISTRY_URL:
       'https://testnet.superhero.aeternity.art/tokenCache/addToken',
     NODE_URL: 'https://testnet.aeternity.io',
@@ -127,6 +143,7 @@ export default {
   },
   data() {
     return {
+      networkId: 'Mainnet',
       token: {
         name: null,
         decimals: 18,
@@ -139,7 +156,6 @@ export default {
       deployed: [],
       loading: false,
       error: null,
-      networkId: 'ae_mainnet',
     };
   },
   computed: {
@@ -171,27 +187,50 @@ export default {
         this.error = '💥 Oops ... unable to add token to registry.';
       }
     },
+    resetForm() {
+      this.token = {
+        name: null,
+        decimals: 18,
+        symbol: null,
+        balanceOwner: null,
+      };
+    },
+    async switchNetwork(networkId) {
+      console.log('switchNetwork', networkId);
+      this.disconnect();
+      this.networkId = networkId == 'ae_mainnet' ? 'Mainnet' : 'Testnet';
+      this.initNode(networkId);
+    },
     async moreTokens() {
-      if (!this.token.name || !this.token.balanceOwner) {
-        this.error = '⚠️ Oops ... fields are required.';
+      this.error = null;
+      try {
+        if (!this.token.name || !this.token.balanceOwner) {
+          this.error = '⚠️ Oops ... fields are required.';
+          return;
+        }
+        this.loading = true;
+        this.token.symbol = this.token.name;
+        const { name, decimals, symbol, balanceOwner } = this.token;
+        console.log(name, decimals, symbol, balanceOwner);
+        const contract = await this.client.getContractInstance(
+          FUNGIBLE_TOKEN_CONTRACT,
+        );
+        const init = await contract.deploy([
+          name,
+          decimals,
+          symbol,
+          balanceOwner,
+        ]);
+        this.registrySubmit(init.address);
+        this.logDeployed(name, init);
+        this.resetForm();
+        this.loading = false;
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+        this.error = '⚠️ Oops ... something went wrong.';
         return;
       }
-      this.loading = true;
-      this.token.symbol = this.token.name;
-      const { name, decimals, symbol, balanceOwner } = this.token;
-      console.log(name, decimals, symbol, balanceOwner);
-      const contract = await this.client.getContractInstance(
-        FUNGIBLE_TOKEN_CONTRACT,
-      );
-      const init = await contract.deploy([
-        name,
-        decimals,
-        symbol,
-        balanceOwner,
-      ]);
-      this.loading = false;
-      this.registrySubmit(init.address);
-      this.logDeployed(name, init);
     },
     async disconnect() {
       await this.client.disconnectWallet();
@@ -240,43 +279,50 @@ export default {
         console.log(e);
       }
     },
+    async initNode(networkId) {
+      const node = await Node({
+        url: networks[networkId].NODE_URL,
+        internalUrl: networks[networkId].NODE_INTERNAL_URL,
+      });
+      const that = this;
+      this.client = await RpcAepp({
+        name: 'AEPP',
+        nodes: [{ name: networkId, instance: node }],
+        compilerUrl: networks[networkId].COMPILER_URL,
+        onNetworkChange(params) {
+          console.log(params);
+          if (this.getNetworkId() !== params.networkId) {
+            console.log(
+              `Detected wallet network switch. Trying to initialize node for ${params.networkId}`,
+            );
+            that.switchNetwork(
+              params.networkId == 'ae_mainnet' ? 'Mainnet' : 'Testnet',
+            );
+          }
+        },
+        onAddressChange: async addresses => {
+          console.log(addresses);
+          this.pub = await this.client.address();
+          this.balance = await this.client.balance(this.pub).catch(e => {
+            console.log(e);
+            return 0;
+          });
+          this.addressResponse = await errorAsField(this.client.address());
+        },
+        onDisconnect(a) {
+          console.log('disconnect');
+          console.log(a);
+        },
+      });
+      this.height = await this.client.height();
+      console.log('height', this.height);
+
+      // Start looking for wallets
+      await this.scanForWallets();
+    },
   },
   async created() {
-    const node = await Node({
-      url: networks[this.networkId].NODE_URL,
-      internalUrl: networks[this.networkId].NODE_INTERNAL_URL,
-    });
-    this.client = await RpcAepp({
-      name: 'AEPP',
-      nodes: [{ name: this.networkId, instance: node }],
-      compilerUrl: networks[this.networkId].COMPILER_URL,
-      onNetworkChange(params) {
-        console.log(params);
-        if (this.getNetworkId() !== params.networkId)
-          alert(
-            `Connected network ${this.getNetworkId()} is not supported with wallet network ${
-              params.networkId
-            }`,
-          );
-      },
-      onAddressChange: async addresses => {
-        console.log(addresses);
-        this.pub = await this.client.address();
-        this.balance = await this.client.balance(this.pub).catch(e => {
-          console.log(e);
-          return 0;
-        });
-        this.addressResponse = await errorAsField(this.client.address());
-      },
-      onDisconnect(a) {
-        console.log('disconnect');
-        console.log(a);
-      },
-    });
-    this.height = await this.client.height();
-
-    // Start looking for wallets
-    await this.scanForWallets();
+    this.initNode(this.networkId);
   },
 };
 </script>
