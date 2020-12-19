@@ -12,6 +12,7 @@
     "@aeternity/aepp-sdk": "^7.7.0",
     "aeternity-fungible-token": "github:mradkov/aeternity-fungible-token",
     "axios": "^0.21.0",
+    "bignumber.js": "^9.0.1",
     "buefy": "^0.9.4",
     "core-js": "^3.6.5",
     "vue": "^2.6.11"

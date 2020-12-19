@@ -39,6 +39,7 @@
                     class="input is-primary"
                     type="number"
                     v-model="token.balanceOwner"
+                    maxlength="15"
                     placeholder="Owner's balance"
                   />
                 </div>
@@ -109,6 +110,7 @@ import Node from '@aeternity/aepp-sdk/es/node';
 import FUNGIBLE_TOKEN_CONTRACT from 'aeternity-fungible-token/FungibleTokenFull.aes';
 import { AeAddress } from '@aeternity/aepp-components';
 import axios from 'axios';
+import BigNumber from 'bignumber.js';
 
 // Send wallet connection info to Aepp throug content script
 const networks = {
@@ -211,7 +213,10 @@ export default {
         this.loading = true;
         this.token.symbol = this.token.name;
         const { name, decimals, symbol, balanceOwner } = this.token;
-        console.log(name, decimals, symbol, balanceOwner);
+        const initialBalance = BigNumber(balanceOwner).shiftedBy(
+          this.token.decimals,
+        );
+        console.log(name, decimals, symbol, initialBalance);
         const contract = await this.client.getContractInstance(
           FUNGIBLE_TOKEN_CONTRACT,
         );
@@ -219,7 +224,7 @@ export default {
           name,
           decimals,
           symbol,
-          balanceOwner,
+          initialBalance.toString(),
         ]);
         this.registrySubmit(init.address);
         this.logDeployed(name, init);
