@@ -219,7 +219,7 @@ export default {
           name,
           decimals,
           symbol,
-          balanceOwner,
+          `${balanceOwner}${'0'.repeat(decimals)}`,
         ]);
         this.registrySubmit(init.address);
         this.logDeployed(name, init);
